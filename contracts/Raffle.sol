@@ -9,16 +9,34 @@
  */
 
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.8;
+pragma solidity ^0.8.7;
 
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
 
-//import "./PriceConverter.sol";
+
 error Raffle__NotEnoughETHEntered();
 error Raffle__TransferFailed();
 error Raffle__NotOpen();
+error Raffle__UpkeepNotNeeded(uint256 currentBalance, uint256 numPlayers, uint256 raffeState);
+
+
+/** 
+ *@title  Ejemplo de un contrato de rifas 
+ * @author yoel torres
+ * @notice Este contrato es para crear un temporizador decentralizado para rifas
+ * @dev este implementa chainlink y chainlik keeper
+ * 
+ * 
+ * 
+ */
+
+
+
+
+
+
 
 //Implemento estas 2 interfaces.
 contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
@@ -46,6 +64,8 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     address private s_recentWinner;
     //Variable creada del tipo de dato Enum
     RaffleState private s_rafflestate;
+    uint256 private s_lastTimeStamp;
+    uint256 private immutable i_interval;
 
     /*Events */
     //Es una buena practica que los eventos tenga el nombre de la funcion que van a usar, pero invertido en este caso enterRaffle, tiene un evento llamado raffleEnter
@@ -58,7 +78,8 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         uint256 entranceFee,
         bytes32 gasLane,
         uint64 suscripcionId,
-        uint16 callbackGasLimit
+        uint16 callbackGasLimit,
+        uint256 interval
     ) VRFConsumerBaseV2(vrfCoordinatorV2) {
         i_entranceFee = entranceFee;
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
@@ -66,6 +87,9 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         i_suscripcionId = suscripcionId; //ID de la suscripcion de nuestro contrato a chainlink
         i_callbackGasLimit = callbackGasLimit;
         s_rafflestate = RaffleState.OPEN; // Inicializo la variable con enum
+        s_lastTimeStamp = block.timestamp;
+    i_interval = interval;
+    
     }
 
     function enterRaffle() public payable {
@@ -96,13 +120,34 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
      *
      */
 
-    function checkUpkeep(bytes calldata /*checkData*/) external override {}
+
+    //Este me valida si se cumple todas las condiciones para poder hacer la solicitud de un nuevo ganador
+    function checkUpkeep(bytes memory /*checkData*/) public override returns(bool upkeepNeeded, bytes memory /* perfomData*/){
+
+        bool isOpen  = (RaffleState.OPEN == s_rafflestate);
+        bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
+        bool hasPlayers = (s_players.length > 0);
+        bool hasBalance = address(this).balance > 0;
+
+         upkeepNeeded = (isOpen && timePassed && hasPlayers && hasBalance);
+
+    
+    }
 
     //Para que se mas barato uso external, ya que solo mi contrato puede llamarlo.
-    function requestRandomWinner() external {
+    function performUpkeep( bytes calldata /*perfomData*/) external override {
         //Request the random number
         //Once we get it, do something with it
         //2 transaction process
+
+        (bool upkeepNeeded, /*Aqui va el return del perfomdata */) = checkUpkeep(""); 
+
+            //si no se cumple la condicion devuelta por el checkupkeep
+            if(!upkeepNeeded){
+                    revert Raffle__UpkeepNotNeeded(address(this).balance, s_players.length, uint256(s_rafflestate));
+            }
+
+
 
         s_rafflestate = RaffleState.CALCULATING; // actualizo mi valor de s_raffle para evitar que alguien entre mientras se este calculando
         uint256 requestId = i_vrfCoordinator.requestRandomWords(
@@ -116,6 +161,8 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         emit RequestedRaffleWinner(requestId);
     }
 
+   
+//Funcion para obtener un numero random
     function fulfillRandomWords(
         uint256 /* requestId*/,
         uint256[] memory randomWords
@@ -126,6 +173,11 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
 
         s_recentWinner = recentWinner;
         s_rafflestate = RaffleState.OPEN; // aqui vuelvo a poner la variable en open
+
+        //Despues de sacar un ganador, necesito resetear mi arreglo.
+        s_players = new address payable[](0);
+        s_lastTimeStamp = block.timestamp;
+
         (bool success, ) = recentWinner.call{value: address(this).balance}(""); //le envio todo el dinero al ganador
 
         if (!success) {
@@ -147,4 +199,29 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     function getRecentWinner() public view returns (address) {
         return s_recentWinner;
     }
+
+    function getRaffleState() public view returns (RaffleState) {
+        return s_rafflestate;
+    }
+
+//Este get es pure, ya que estoy leyendo una constante, por lo que no tengo que hacerla una view
+    function getNumWords() public pure returns (uint256) {
+        return NUMWORDS;
+    }
+
+    function getNumberOfPlayers() public view returns (uint256) {
+        return s_players.length;
+    }
+
+    function getLastestTimeStamp() public view returns (uint256) {
+        return s_lastTimeStamp;
+    }
+
+    //Esta tambie lee una constante
+    function getRequestConfirmation() public pure returns (uint256) {
+        return REQUEST_CONFIRMATIONS;
+    }
+
+
+
 }
