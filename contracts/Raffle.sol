@@ -18,23 +18,18 @@ import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
 
 error Raffle__NotEnoughETHEntered();
 error Raffle__TransferFailed();
-error Raffle__NotOpen();
+error Raffle__RaffleNotOpen();
 error Raffle__UpkeepNotNeeded(uint256 currentBalance, uint256 numPlayers, uint256 raffeState);
-
 
 /** 
  *@title  Ejemplo de un contrato de rifas 
  * @author yoel torres
  * @notice Este contrato es para crear un temporizador decentralizado para rifas
- * @dev este implementa chainlink y chainlik keeper
+ * @dev este implementa chainlink coordinator y chainlik keeper
  * 
  * 
  * 
  */
-
-
-
-
 
 
 
@@ -99,7 +94,7 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
 
         //Valido si la raffle no esta abierta, de lo contrario la reyecto
         if (s_rafflestate != RaffleState.OPEN) {
-            revert Raffle__NotOpen();
+            revert Raffle__RaffleNotOpen();
         }
 
         s_players.push(payable(msg.sender));
@@ -161,6 +156,9 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         emit RequestedRaffleWinner(requestId);
     }
 
+
+    
+
    
 //Funcion para obtener un numero random
     function fulfillRandomWords(
@@ -213,13 +211,17 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         return s_players.length;
     }
 
-    function getLastestTimeStamp() public view returns (uint256) {
+    function getLastTimeStamp() public view returns (uint256) {
         return s_lastTimeStamp;
     }
 
     //Esta tambie lee una constante
     function getRequestConfirmation() public pure returns (uint256) {
         return REQUEST_CONFIRMATIONS;
+    }
+
+    function getInterval() public view returns (uint256) {
+        return i_interval;
     }
 
 
