@@ -52,7 +52,7 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     uint16 private immutable i_callbackGasLimit;
 
     uint16 private constant REQUEST_CONFIRMATIONS = 3;
-    uint32 private constant NUMWORDS = 2;
+    uint32 private constant NUM_WORDS = 2;
 
     //Lottery Variables
 
@@ -119,14 +119,12 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     //Este me valida si se cumple todas las condiciones para poder hacer la solicitud de un nuevo ganador
     function checkUpkeep(bytes memory /*checkData*/) public override returns(bool upkeepNeeded, bytes memory /* perfomData*/){
 
-        bool isOpen  = (RaffleState.OPEN == s_rafflestate);
+        bool isOpen = RaffleState.OPEN == s_rafflestate;
         bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
-        bool hasPlayers = (s_players.length > 0);
+        bool hasPlayers = s_players.length > 0;
         bool hasBalance = address(this).balance > 0;
-
-         upkeepNeeded = (isOpen && timePassed && hasPlayers && hasBalance);
-
-    
+        upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers);
+        return (upkeepNeeded, "0x0"); // can we comment this out?
     }
 
     //Para que se mas barato uso external, ya que solo mi contrato puede llamarlo.
@@ -150,7 +148,7 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
             i_suscripcionId,
             REQUEST_CONFIRMATIONS,
             i_callbackGasLimit,
-            NUMWORDS
+            NUM_WORDS
         );
 
         emit RequestedRaffleWinner(requestId);
@@ -204,7 +202,7 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
 
 //Este get es pure, ya que estoy leyendo una constante, por lo que no tengo que hacerla una view
     function getNumWords() public pure returns (uint256) {
-        return NUMWORDS;
+        return NUM_WORDS;
     }
 
     function getNumberOfPlayers() public view returns (uint256) {
@@ -224,6 +222,8 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         return i_interval;
     }
 
+     receive() external payable {}
 
+    fallback() external payable {}
 
 }

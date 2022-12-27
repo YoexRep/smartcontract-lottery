@@ -20,7 +20,13 @@ module.exports = {
         compilers: [{ version: "0.8.8" }, { version: "0.6.6" }, {version: "0.8.17"}],
       },
     defaultNetwork: "hardhat",
-    networks: {
+    networks: { 
+      hardhat: {
+      chainId: 31337,
+  },
+  localhost: {
+      chainId: 31337,
+  },
       goerli: {
         url: GOERLI_RPC_URL,
         accounts: [PRIVATE_KEY], // Es la direccion de clave privada de mi wallet
